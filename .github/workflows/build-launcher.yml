@@ -34,13 +34,18 @@ jobs:
           KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
         run: |
           test -n "$KEYSTORE_B64" || { echo "::error::secret DEBUG_KEYSTORE_B64 is not set"; exit 1; }
-          mkdir -p ~/.android
-          printf '%s' "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tvhome.keystore"
       - name: Build release APK
         working-directory: launcher
+        # The injected signing properties override signingConfigs.debug, so the APK is signed with the
+        # fixed key whatever debug keystore AGP would otherwise find or generate.
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
+          ./gradlew --no-daemon assembleRelease \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/tvhome.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
       - name: Signer
         run: |
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs \
